@@ -50,26 +50,29 @@ class GraphitePusher:
             path = '.'.join([self._prefix, path])
         return path
 
-    def add(self, timestamp, value, paths: list):
+    def add(self, timestamp, value, paths):
         path = self._get_path(paths)
         self._batch.append((path, (timestamp, value)))
-        logger.debug(f'Adding metrics to {path}, {value}.')
-        logger.debug(f'Batch size {len(self._batch)}/{self._retention}.')
+        logger.debug('Adding metrics to {}, {}.'.format(path, value))
+        logger.debug('Batch size {}/{}.'.format(len(self._batch), self._retention))
         if len(self._batch) < self._retention:
             return
         logger.info('Reached retention limit, pushing.')
         self.push()
 
     def push(self):
-        batch = tuple(self._batch)
-        self._batch.clear()
-        batch = pickle.dumps(batch)
-        batch = self._add_header(batch)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            batch = tuple(self._batch)
+            del self._batch[:]
+            batch = pickle.dumps(batch)
+            batch = self._add_header(batch)
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((self._host, self._port))
             sock.sendall(batch)
             sock.close()
-            logger.info(f'Successfully pushed {len(batch)} bytes to {self._host}:{self._port}.')
+            logger.info('Successfully pushed {} bytes to {}:{}.'.format(len(batch), self._host, self._port))
+        except Exception:
+            logger.exception("failed to push")
 
     def add_event(self, what, tags, when, data):
         if not self._events_url:
@@ -86,7 +89,7 @@ class GraphitePusher:
             'data': data
         }
 
-        logger.info(f'Pushing event {post_data}')
+        logger.info('Pushing event {}'.format(post_data))
 
         try:
             post(self._events_url, data=json_dumps(post_data))

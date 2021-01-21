@@ -31,7 +31,7 @@ class CeleryCamera(Polaroid):
     STATES_DICT = {key: 0 for key in task_states.ALL_STATES}
 
     def __init__(self, pusher, verbose_exception=False, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super(CeleryCamera, self).__init__(*args, **kwargs)
         self._dict = None
         self._pusher = pusher
         self._verbose_exception = verbose_exception
@@ -47,7 +47,7 @@ class CeleryCamera(Polaroid):
     def _extract_task_name(name):
         return name.split('.')[-1]
 
-    def _process_tasks(self, state: State, timestamp):
+    def _process_tasks(self, state, timestamp):
         tasks = self._get_dict(state)
         for task in state.tasks.values():
 
@@ -57,7 +57,7 @@ class CeleryCamera(Polaroid):
 
             tasks[task.name][task.state] += 1
             if task.state == task_states.FAILURE:
-                logger.info(f'Adding exception event {task.exception}.')
+                logger.info('Adding exception event {}.'.format(task.exception))
                 data = task.info() if self._verbose_exception else task.exception
                 self._pusher.add_event(
                     what='Exception',
@@ -69,10 +69,10 @@ class CeleryCamera(Polaroid):
         for task, states in tasks.items():
             for state, amount in states.items():
                 task_name = self._extract_task_name(task)
-                logger.debug(f'Adding metrics for {task_name}.{state} - {amount}.')
+                logger.debug('Adding metrics for {}.{} - {}.'.format(task_name, state, amount))
                 self._pusher.add(timestamp, amount, ['tasks', 'by_name', task_name, state])
 
-    def _process_workers(self, state: State, timestamp):
+    def _process_workers(self, state, timestamp):
         for worker_name, worker_state in state.workers.items():
             self._pusher.add(
                 timestamp,
@@ -84,7 +84,7 @@ class CeleryCamera(Polaroid):
         for _ in state.alive_workers():
             workers_alive += 1
 
-        logger.info(f'Adding metrics workers.alive {workers_alive}.')
+        logger.info('Adding metrics workers.alive {}.'.format(workers_alive))
         self._pusher.add(timestamp, workers_alive, ['workers', 'alive'])
 
     def on_shutter(self, state):
